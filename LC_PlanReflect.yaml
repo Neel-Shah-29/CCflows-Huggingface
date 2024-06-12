@@ -1,0 +1,83 @@
+name: "CodeReflect_Flow"
+description: |-2
+  Given a problem description, generate code, reflect on it and improve it until a message suggesting that the code seems correct or a maximum number of rounds is reached.
+
+# ~~~ Input interface specification ~~~
+input_interface:
+  - "problem_description"
+  - "io_description"
+  - "constraints"
+
+# ~~~ Output interface specification ~~~
+output_interface:
+  - "plan"
+
+# ~~~ Flow specification ~~~
+max_rounds: 4
+early_exit_key: "end_of_interaction"
+
+subflows_config:
+  PlanGenerator:
+    _target_: .LC_Plan.instantiate_from_default_config
+  PlanReflectCritic:
+    _target_: .FixedReply_PlanReflect.instantiate_from_default_config
+
+### Topology specification (specifies how the sequence of messages will flow from one of the subflows to another)
+topology:
+  # ~~~ Plan Generator ~~~
+  - goal: "Generate/refine a plan."
+
+    ### Input Interface
+    input_interface:
+      _target_: aiflows.interfaces.KeyInterface
+      additional_transformations:
+        - _target_: aiflows.data_transformations.KeyMatchInput
+      keys_to_rename:
+        plan_reflect_message: "query"
+
+    ### Flow Specification
+    flow: PlanGenerator
+
+    ### Output Interface
+    output_interface:
+      _target_: aiflows.interfaces.KeyInterface
+      additional_transformations:
+        - _target_: aiflows.data_transformations.RegexFirstOccurrenceExtractor
+          regex: '(?<=Conceptual solution)([\s\S]*?)(?=\n\n# [A-Z]|\Z)'
+          regex_fallback:
+            - '(?<=Conceptual solution:)([\s\S]*?)(?=\n\n# [A-Z]|\Z)'
+          input_key: "api_output"
+          output_key: "plan"
+          strip: True
+          assert_unique: True
+        - _target_: aiflows.data_transformations.EndOfInteraction
+          end_of_interaction_string: "Final answer"
+          input_key: "api_output"
+          output_key: "end_of_interaction"
+        - _target_: aiflows.data_transformations.PrintPreviousMessages
+      keys_to_select:
+        - "plan"
+        - "end_of_interaction"
+
+    ### Reset flag
+    reset: false
+
+  - goal: "Generate a message that encourages reflection."
+
+    ### Input Interface
+    input_interface:
+      _target_: aiflows.interfaces.KeyInterface
+      additional_transformations:
+        - _target_: aiflows.data_transformations.KeyMatchInput
+
+    ### Flow Specification
+    flow: PlanReflectCritic
+
+    ### Output Interface
+    output_interface:
+      _target_: aiflows.interfaces.KeyInterface
+      keys_to_rename:
+        fixed_reply: "plan_reflect_message"
+
+    ### Reset flag
+    reset: true

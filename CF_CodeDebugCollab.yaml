@@ -1,0 +1,93 @@
+name: "CodeDebugCollab_Flow"
+description: |2-
+  Given a problem description, alternate between a step in which code is generated, and a step in which the produced code is evaluated and useful feedback is provided. 
+
+# ~~~ Input interface specification ~~~
+input_interface:
+  - "problem_description"
+  - "input_description"
+  - "output_description"
+  - "io_examples_and_explanation"
+  - "public_tests_individual_io"
+
+# ~~~ Output interface specification ~~~
+output_interface:
+  - "code"
+
+# ~~~ Flow specification ~~~
+max_rounds: 4
+
+subflows_config:
+  CodeGenerator:
+    _target_: .CF_Code.instantiate_from_default_config
+    name: "CodeGenerator"
+    backend:
+      _target_: aiflows.backends.llm_lite.LiteLLMBackend
+      model_name:
+        openai: "gpt-4"
+        azure: "azure/gpt-4"
+    human_message_prompt_template:
+      _target_: aiflows.prompt_template.JinjaPrompt
+      template: |2-
+        {{testing_results_summary}}
+      
+        {{code_feedback}}
+
+
+        Consider the problem statement, the last proposed solution, its issue and the provided feedback. Return a corrected version of the code that solves the original problem and resolves the issue, without any explanation, in the following format:
+        ```python
+        {{code_placeholder}}
+        ```
+      input_variables:
+        - code_feedback
+        - testing_results_summary
+      partial_variables:
+        code_placeholder: "{{python_code}}"
+    input_interface_initialized:
+      - "code_feedback"
+      - "testing_results_summary"
+  CodeDebugCritic:
+    _target_: .CF_CodeDebugCritic.instantiate_from_default_config
+
+topology:
+  # ~~~ Code Generator ~~~
+  - goal: "Generate/refine a solution."
+
+    ### Input Interface
+    input_interface:
+      _target_: aiflows.interfaces.KeyInterface
+      additional_transformations:
+        - _target_: aiflows.data_transformations.KeyMatchInput
+
+    ### Flow Specification
+    flow: CodeGenerator
+
+    ### Output Interface
+    output_interface:
+      _target_: aiflows.interfaces.KeyInterface
+      additional_transformations:
+        - _target_: aiflows.data_transformations.RegexFirstOccurrenceExtractor
+          regex: '(?<=```python)([\s\S]*?)(?=```)'
+          regex_fallback: '(?<=```)([\s\S]*?)(?=```)'
+          input_key: "api_output"
+          output_key: "code"
+          strip: True
+          assert_unique: True
+      keys_to_select:
+        - "code"
+
+    reset: false
+
+  # ~~~ Code Critic Grounded in Tests ~~~
+  - goal: "Provide feedback for the candidate solution that is grounded in test results."
+
+    ### Input Interface
+    input_interface:
+      _target_: aiflows.interfaces.KeyInterface
+      additional_transformations:
+        - _target_: aiflows.data_transformations.KeyMatchInput
+
+    ### Flow Specification
+    flow: CodeDebugCritic
+
+    reset: true

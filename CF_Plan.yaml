@@ -1,0 +1,83 @@
+name: "Plan_Flow"
+description: |2- 
+  Given a problem description, generate a high-level solution strategy.
+
+# ~~~ Input interface specification ~~~
+input_interface_non_initialized:  # Applied when constructing the first user message.
+  - "problem_description"
+  - "input_description"
+  - "output_description"
+  - "io_examples_and_explanation"
+
+input_interface_initialized:  # Applied when constructing all subsequent user messages.
+  - "query"
+
+# ~~~ Output interface specification ~~~
+output_interface:
+  - "api_output"
+
+# ~~~ Flow specification ~~~
+backend:
+  model_name:
+    openai: "gpt-4"
+    azure: "azure/gpt-4"
+  n: 1
+  max_tokens: 3000
+  temperature: 0.3
+
+  top_p: 0.2
+  frequency_penalty: 0
+  presence_penalty: 0
+
+system_message_prompt_template:
+  _target_: aiflows.prompt_template.JinjaPrompt
+  template: |2-
+    Your goal is to provide a high-level conceptual solution that, if implemented, will solve a given competitive programming problem.
+
+    The user will specify the problem by providing you with:
+      - the problem statement
+      - input description
+      - output description
+      - example test cases
+      - (optional) explanation of the test cases
+
+    The proposed algorithm should be computationally efficient, logically correct and handle all corner cases.
+
+    The user will provide you with a task and an output format that you will strictly follow.
+  input_variables: []
+  
+
+human_message_prompt_template:
+  _target_: aiflows.prompt_template.JinjaPrompt
+  template: "{{query}}"
+  input_variables:
+    - "query"
+  
+
+init_human_message_prompt_template:
+  _target_: aiflows.prompt_template.JinjaPrompt
+  template: |2-
+    # Problem statement
+    {{problem_description}}
+
+    # Input description
+    {{input_description}}
+
+    # Output description
+    {{output_description}}
+
+    {{io_examples_and_explanation}}
+
+
+    Return a high-level conceptual solution that would solve the problem. Be very concise, and do not provide code.
+    Reply in the following format:
+    # Conceptual solution
+    {{plan_placeholder}}
+  input_variables:
+    - "problem_description"
+    - "input_description"
+    - "output_description"
+    - "io_examples_and_explanation"
+  partial_variables:
+    plan_placeholder: "{{conceptual_solution}}"
+  

@@ -1,0 +1,94 @@
+name: "PlanCollab_Flow"
+description: |2-
+  Given a problem description, alternate between a step in which a solution strategy is generated, and a step in which the solution strategy is evaluated and useful feedback is provided.
+
+# ~~~ Input interface specification ~~~
+input_interface:
+  - "problem_description"
+  - "io_description"
+  - "constraints"
+  - "python_stub"
+
+# ~~~ Output interface specification ~~~
+output_interface:
+  - "plan"
+
+# ~~~ Flow specification ~~~
+max_rounds: 4
+early_exit_key: "end_of_interaction"
+
+subflows_config:
+  PlanGenerator:
+    _target_: .LC_Plan.instantiate_from_default_config
+    human_message_prompt_template:
+      _target_: aiflows.prompt_template.JinjaPrompt
+      template: |2-
+        # Feedback on the last proposed conceptual solution
+        {{plan_feedback}}
+  
+  
+        Consider the original problem statement, the last proposed solution and the provided feedback. Does the solution need to be updated? If so, provide the corrected version of the conceptual solution in the following format:
+        # Conceptual solution
+        {{plan_placeholder}}
+        otherwise, reply:
+        "Final answer."
+      input_variables:
+        - plan_feedback
+      partial_variables:
+        plan_placeholder: "{{conceptual_solution}}"
+      
+    input_interface_initialized:
+      - "plan_feedback"
+  PlanCritic:
+    _target_: .LC_PlanCritic.instantiate_from_default_config
+
+topology:
+  # ~~~ Plan Generator ~~~
+  - goal: "Generate/refine a solution."
+
+    ### Input Interface
+    input_interface:
+      _target_: aiflows.interfaces.KeyInterface
+      additional_transformations:
+        - _target_: aiflows.data_transformations.KeyMatchInput
+
+    ### Flow Specification
+    flow: PlanGenerator
+
+    ### Output Interface
+    output_interface:
+      _target_: aiflows.interfaces.KeyInterface
+      additional_transformations:
+        - _target_: aiflows.data_transformations.RegexFirstOccurrenceExtractor
+          regex: '(?<=Conceptual solution)([\s\S]*?)(?=\n\n# [A-Z]|\Z)'
+          regex_fallback:
+            - '(?<=Conceptual solution:)([\s\S]*?)(?=\n\n# [A-Z]|\Z)'
+          input_key: "api_output"
+          output_key: "plan"
+          strip: True
+          assert_unique: True
+        - _target_: aiflows.data_transformations.EndOfInteraction
+          end_of_interaction_string: "Final answer"
+          input_key: "api_output"
+          output_key: "end_of_interaction"
+        - _target_: aiflows.data_transformations.PrintPreviousMessages
+    reset: false
+  # ~~~ Plan Critic ~~~
+  - goal: "Provide feedback for the candidate solution."
+
+    ### Input Interface
+    input_interface:
+      _target_: aiflows.interfaces.KeyInterface
+      additional_transformations:
+        - _target_: aiflows.data_transformations.KeyMatchInput
+
+    ### Flow Specification
+    flow: PlanCritic
+
+    ### Output Interface
+    output_interface:
+      _target_: aiflows.interfaces.KeyInterface
+      keys_to_rename:
+        api_output: "plan_feedback"
+
+    reset: true

@@ -1,0 +1,177 @@
+name: "CodeDebug_Flow"
+description: |2-
+  Given a problem description, generate code, test and refine it until all tests pass or a maximum number of rounds is reached.
+
+# ~~~ Input interface specification ~~~
+input_interface:
+  - "problem_description"
+  - "io_description"
+  - "constraints"
+  - "python_stub"
+  - "public_tests_individual_io"
+
+# ~~~ Output interface specification ~~~
+output_interface:
+  - "code"
+
+# ~~~ Flow specification ~~~
+max_rounds: 4
+
+### Subflows specification
+subflows_config:
+  CodeGenerator:
+    _target_: .LC_Code.instantiate_from_default_config
+    name: "CodeGenerator"
+    backend:
+      _target_: aiflows.backends.llm_lite.LiteLLMBackend
+      api_infos: ???
+      model_name:
+        openai: "gpt-4"
+        azure: "azure/gpt-4"
+    human_message_prompt_template:
+      template: |2-
+        {{testing_results_summary}}
+
+
+        Consider the problem statement, the last proposed solution, and its issue. Provide a corrected version of the code that solves the original problem and resolves the issue, without any explanation, in the following format:
+        ```python
+        {{code_placeholder}}
+        ```
+      input_variables:
+        - testing_results_summary
+      partial_variables:
+        code_placeholder: "{{python_code}}"
+
+    input_interface_initialized:
+      - "testing_results_summary"
+  CodeTestingCritic:
+    _target_: .LC_CodeTesting.instantiate_from_default_config
+
+### Topology specification (specifies how the sequence of messages will flow from one of the subflows to another)
+topology:
+  # ~~~ Code Generator ~~~
+  - goal: "Generate/refine a solution."
+
+    ### Input Interface
+    input_interface:
+      _target_: aiflows.interfaces.KeyInterface
+      additional_transformations:
+        - _target_: aiflows.data_transformations.KeyMatchInput
+
+    ### Flow Specification
+    flow: CodeGenerator
+
+    ### Output Interface
+    output_interface:
+      _target_: aiflows.interfaces.KeyInterface
+      additional_transformations:
+        - _target_: aiflows.data_transformations.RegexFirstOccurrenceExtractor
+          regex: '(?<=```python)([\s\S]*?)(?=```)'
+          regex_fallback: '(?<=```)([\s\S]*?)(?=```)'
+          input_key: "api_output"
+          output_key: "code"
+          strip: True
+          assert_unique: True
+        - _target_: aiflows.data_transformations.PrintPreviousMessages
+      keys_to_select:
+        - "code"
+
+    ### Reset flag
+    reset: false
+
+  # ~~~ Code Testing Critic ~~~
+  - goal: "Test the code on the public tests and provide a results summary."
+
+    ### Input Interface
+    input_interface:
+      _target_: aiflows.interfaces.KeyInterface
+      additional_transformations:
+        - _target_: aiflows.data_transformations.KeyMatchInput
+
+    ### Flow Specification
+    flow: CodeTestingCritic
+
+    ### Output Interface
+    output_interface:
+      _target_: aiflows.interfaces.KeyInterface
+      additional_transformations:
+        - _target_: .src.data_transformations.CorrectnessFlag
+          input_key: "public_tests_results"
+          output_key: "all_tests_passed"
+        - _target_: .src.data_transformations.TestingResultsSummaryGeneration
+          output_key: "testing_results_summary"
+
+          single_test_error_message: True
+
+          no_error_template: |2-
+            ${.issue_title}
+            All of the executed tests passed.
+
+          compilation_error_template: |2-
+            ${.issue_title}
+            The execution resulted in a compilation error.
+            ## Compilation error message:
+            {{error_message}}
+          timeout_error_template: |2-
+            ${.issue_title}
+            The execution timed out, the solution is not efficient enough.
+          runtime_error_template: |2-
+            ${.issue_title}
+            The execution resulted in a runtime error on the following test.
+            ## [Failed test] Input
+            ```
+            {{test_input}}
+            ```
+            ## [Failed test] Runtime error message
+            {{error_message}}
+          single_test_error_template: |2-
+            ${.issue_title}
+            The Python code does not solve the problem in the problem description due to logical errors. It fails the following test:
+            ## [Failed test] Input
+            ```
+            {{test_input}}
+            ```
+            ## [Failed test] Expected output
+            ```
+            {{expected_output}}
+            ```
+            ## [Failed test] Generated output
+            ```
+            {{generated_output}}
+            ```
+          all_tests_header: |2-
+            ${.issue_title}
+            The Python code does not solve the problem in the problem description due to logical errors. It fails on the following tests.
+          test_error_template: |2-
+            ## [Failed test {{idx}}]
+            ### [Failed test {{idx}}] Input
+            ```
+            {{test_input}}
+            ```
+            ### [Failed test {{idx}}] Expected output
+            ```
+            {{expected_output}}
+            ```
+            ### [Failed test {{idx}}] Generated output
+            ```
+            {{generated_output}}
+            ```
+          tests_separator: "\n\n"
+
+          issue_title: "# Issue with the last proposed solution"
+
+          feedback_title: "# Feedback on the last proposed solution"
+
+          no_code_template: |2-
+            ${.feedback_title}
+            The code was not provided in the correct output format specified in the request or it was not provided at all.
+          feedback_only_template: |2-
+            ${.feedback_title}
+            {{feedback_content}}
+          feedback_and_issue_template: |2-
+            {{issue_description}}
+      
+            {{feedback_content}}
+
+    ### Reset flag
+    reset: true

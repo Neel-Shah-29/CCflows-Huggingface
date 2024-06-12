@@ -1,0 +1,86 @@
+name: "CodeReflect_Flow"
+description: |-2
+  Given a problem description, generate code, reflecting on it and improving it until a message suggesting that the code seems correct or a maximum number of rounds is reached."
+
+# ~~~ Input interface specification ~~~
+input_interface:
+  - "problem_description"
+  - "io_description"
+  - "constraints"
+  - "python_stub"
+
+# ~~~ Output interface specification ~~~
+output_interface:
+  - "code"
+
+# ~~~ Flow specification ~~~
+max_rounds: 4
+
+### Subflows specification
+subflows_config:
+  CodeGenerator:
+    _target_: .LC_Code.instantiate_from_default_config
+  CodeReflectCritic:
+    _target_: .FixedReply_CodeReflect.instantiate_from_default_config
+
+### Topology specification (specifies how the sequence of messages will flow from one of the subflows to another)
+topology:
+  # ~~~ Code Generator ~~~
+  - goal: "Generate/refine a solution."
+
+    ### Input Interface
+    input_interface:
+      _target_: aiflows.interfaces.KeyInterface
+      additional_transformations:
+        - _target_: aiflows.data_transformations.KeyMatchInput
+      keys_to_rename:
+        code_reflect_message: "query"
+
+    ### Flow Specification
+    flow: CodeGenerator
+
+    ### Output Interface
+    output_interface:
+      _target_: aiflows.interfaces.KeyInterface
+      additional_transformations:
+        - _target_: aiflows.data_transformations.RegexFirstOccurrenceExtractor
+          regex: '(?<=```python)([\s\S]*?)(?=```)'
+          regex_fallback: '(?<=```)([\s\S]*?)(?=```)'
+          input_key: "api_output"
+          output_key: "code"
+          strip: True
+          assert_unique: True
+        - _target_: aiflows.data_transformations.EndOfInteraction
+          end_of_interaction_string: "Final answer"
+          input_key: "api_output"
+          output_key: "end_of_interaction"
+        - _target_: aiflows.data_transformations.PrintPreviousMessages
+      keys_to_select:
+        - "code"
+        - "end_of_interaction"
+
+    ### Reset flag
+    reset: false
+
+  - goal: "Generate a message that encourages reflection."
+
+    ### Input Interface
+    input_interface:
+      _target_: aiflows.interfaces.KeyInterface
+      additional_transformations:
+        - _target_: aiflows.data_transformations.KeyMatchInput
+
+
+    ### Flow Specification
+    flow: CodeReflectCritic
+
+    ### Output Interface
+    output_interface:
+      _target_: aiflows.interfaces.KeyInterface
+      keys_to_rename:
+        fixed_reply: "code_reflect_message"
+
+    ### Reset flag
+    reset: true
+
+early_exit_key: "end_of_interaction"

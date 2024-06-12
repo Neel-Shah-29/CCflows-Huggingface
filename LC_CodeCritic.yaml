@@ -1,0 +1,90 @@
+name: "CodeCritic_Flow"
+description: |2-
+  Given a problem description and a solution candidate, provide useful feedback concerning the correctness of the solution candidate.
+
+# ~~~ Input interface specification ~~~
+input_interface_non_initialized:
+  - "problem_description"
+  - "io_description"
+  - "constraints"
+  - "python_stub"
+  - "code"
+
+input_interface_initialized:
+  - "query"
+
+# ~~~ Output interface specification ~~~
+output_interface:
+  - "api_output"
+
+# ~~~ Flow specification ~~~
+backend:
+  _target_: aiflows.backends.llm_lite.LiteLLMBackend
+  api_infos: ???
+  model_name:
+    openai: "gpt-4"
+    azure: "azure/gpt-4"
+
+
+  n: 1
+  max_tokens: 3000
+  temperature: 0.3
+
+  top_p: 0.2
+  frequency_penalty: 0
+  presence_penalty: 0
+
+system_message_prompt_template:
+  _target_: aiflows.prompt_template.JinjaPrompt
+  template: |2-
+    Your goal is to identify potential issues with a competitive programming solution attempt.
+
+    The user will specify the problem by providing you with:
+      - the problem statement
+      - example test cases
+      - the constraints of the problem
+      - (optional) explanation of the test cases
+      - a Python solution attempt
+
+    Crucially, your goal is to correctly identify potential issues with the solution attempt, and not to provide the code implementation yourself.
+    The user will provide you with a task and an output format that you will strictly follow.
+  input_variables: []
+  
+
+human_message_prompt_template:
+  _target_: aiflows.prompt_template.JinjaPrompt
+  template: "{{query}}"
+  input_variables:
+    - "query"
+  
+
+init_human_message_prompt_template:
+  _target_: aiflows.prompt_template.JinjaPrompt
+  template: |2-
+    # Problem statement
+    {{problem_description}}
+
+    {{io_description}}
+
+    # Constraints
+    {{constraints}}
+    
+    # code stub
+    ```python
+    {{python_stub}}
+    ```
+
+    # Python solution attempt
+    ```python
+    {{code}}
+    ```
+
+
+    Consider the problem statement and the solution attempt. Are there any issues with the proposed solution or it is correct? Explain your reasoning very concisely, and do not provide code.
+  input_variables:
+    - "problem_description"
+    - "io_description"
+    - "constraints"
+    - "python_stub"
+    - "code"
+  
