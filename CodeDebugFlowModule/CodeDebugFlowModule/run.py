@@ -25,7 +25,7 @@ if __name__ == "__main__":
 
     # Load flow config
     root_dir = "."
-    cfg_path = os.path.join(root_dir, "CodeDebug.yaml")
+    cfg_path = os.path.join(root_dir, "CodeDebugFlow.yaml")
     cfg = read_yaml_file(cfg_path)
 
     # Set the API information
@@ -37,10 +37,9 @@ if __name__ == "__main__":
     # Serve the Flow
     serving.recursive_serve_flow(
         cl=cl,
-        flow_class_name="flow_modules.aiflows.CodeDebugFlowModule.CodeDebug",
+        flow_class_name="flow_modules.aiflows.CodeDebugFlowModule.CodeDebugFlow",
         flow_endpoint="CodeDebug",
     )
-
     # Start a Worker Thread
     run_dispatch_worker_thread(cl)
 

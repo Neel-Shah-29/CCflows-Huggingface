@@ -1,4 +1,5 @@
 name: "CodeTestingCriticFlow"
+_target_: flow_modules.aiflows.CodeTestingCriticFlowModule.CodeTestingCritic.instantiate_from_default_config
 description: "Tests the generated code and provides feedback."
 input_interface:
   - "code"

@@ -53,9 +53,19 @@ if __name__ == "__main__":
 
     # Prepare data
     data = {
-        "id": 0,
-        "testing_results_summary": "The code failed to handle negative numbers. Provide a corrected version of the code.",
-    }
+    "testing_results_summary": """
+    The current implementation of the function `calculate_sum` has the following issues:
+    - It does not handle negative numbers correctly.
+    - It fails when non-integer inputs are provided.
+    - The function is not optimized for large lists of numbers.
+    
+    Given the problem description and these issues, provide a corrected version of the function that:
+    - Correctly sums both positive and negative numbers.
+    - Validates input to ensure all elements are integers.
+    - Optimizes performance for large lists of numbers.
+    """,
+}
+
 
     input_message = proxy_flow.package_input_message(data=data)
 

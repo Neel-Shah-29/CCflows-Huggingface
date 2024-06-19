@@ -1,11 +1,11 @@
 # ~~~ Specify the dependencies ~~~
 dependencies = [
-    {"url": "aiflows/CodeGeneratorFlowModule", "revision": "main"},
-    {"url": "aiflows/CodeTestingCriticFlowModule", "revision": "main"},
+    {"url": "aiflows/CodeGeneratorFlowModule", "revision": "/home/hadoop_neel/CodeDebugFlowModule/CodeGeneratorFlowModule"},
+    {"url": "aiflows/CodeTestingCriticFlowModule", "revision": "/home/hadoop_neel/CodeDebugFlowModule/CodeTestingCritic"},
 ]
 from aiflows import flow_verse
 
 flow_verse.sync_dependencies(dependencies)
 # ~~~
 
-from .CodeDebug import CodeDebugFlow
+from .CodeDebugFlow import CodeDebugFlow

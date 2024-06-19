@@ -19,7 +19,6 @@ from aiflows import flow_verse
 flow_verse.sync_dependencies(dependencies)
 
 if __name__ == "__main__":
-
     FLOW_MODULES_PATH = "./"
     # Set up a colink server
     cl = start_colink_server()
@@ -41,6 +40,13 @@ if __name__ == "__main__":
 
     # Mount the flow and get its proxy
     proxy_flow = serving.get_flow_instance(
+        cl=cl,
+        flow_endpoint="CodeTestingCritic",
+        user_id="local",
+        config_overrides=cfg
+    )
+
+    proxy_flow2 = serving.get_flow_instance(
         cl=cl,
         flow_endpoint="CodeTestingCritic",
         user_id="local",

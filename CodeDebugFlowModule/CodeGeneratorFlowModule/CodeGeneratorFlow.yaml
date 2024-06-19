@@ -1,5 +1,6 @@
 name: "CodeGeneratorFlow"
 description: "Generates code based on testing results and problem description."
+_target_: flow_modules.aiflows.CodeGeneratorFlowModule.CodeGeneratorFlow.instantiate_from_default_config
 backend:
   model_name:
     openai: "gpt-4"
@@ -18,3 +19,4 @@ input_interface_initialized:
   - "testing_results_summary"
 output_interface:
   - "code"
+

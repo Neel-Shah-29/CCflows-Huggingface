@@ -1,0 +1,32 @@
+name: "CodeDebugFlow"
+description: "Composite flow for generating and testing code."
+max_rounds: 4
+early_exit_key: "all_tests_passed"
+_target_: flow_modules.aiflows.CodeDebugFlowModule.CodeDebugFlow.instantiate_from_default_config
+input_interface:
+  - "problem_description"
+  - "input_description"
+  - "output_description"
+  - "io_examples_and_explanation"
+  - "public_tests_individual_io"
+
+output_interface:
+  - "code"
+  - "all_tests_passed"
+
+subflows_config:
+  CodeGenerator:
+    name: "CodeGenerator"
+    description: "A flow that generates the code based on input, output and previous errors"
+    flow_class_name: flow_modules.aiflows.CodeGeneratorFlowModule.CodeGeneratorFlow
+    flow_endpoint: CodeGenerator
+    user_id: local
+    _target_: flow_modules.aiflows.CodeGeneratorFlowModule.CodeGeneratorFlow.instantiate_from_default_config
+
+  CodeTestingCritic:
+    name: "CodeTestingCritic"
+    description: "A flow to test and debug the code" 
+    flow_class_name: flow_modules.aiflows.CodeTestingCriticFlowModule.CodeTestingCritic
+    flow_endpoint: CodeTestingCritic
+    user_id: local
+    _target_: flow_modules.aiflows.CodeTestingCriticFlowModule.CodeTestingCritic.instantiate_from_default_config
